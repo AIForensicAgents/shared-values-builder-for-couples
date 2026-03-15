@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shared Values Builder for Couples</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+<script src="https://unpkg.com/canvas-confetti@1.9.2/dist/confetti.browser.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --warm-cream: #FFF8F0;
+  --soft-coral: #F4845F;
+  --deep-teal: #2D6A6A;
+  --gentle-sage: #A8C5A0;
+  --warm-gold: #E8B04A;
+  --soft-lavender: #C4B1D4;
+  --deep-navy: #2C3E50;
+}
+* { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+h1, h2, .display-font { font-family: 'Playfair Display', serif; }
+body { background: var(--warm-cream); }
+.gradient-header { background: linear-gradient(135deg, var(--deep-teal), #3D8B8B); }
+.card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+.btn-primary { background: linear-gradient(135deg, var(--soft-coral), #E6734F); }
+.btn-primary:hover { background: linear-gradient(135deg, #E6734F, #D4623E); }
+.btn-secondary { background: linear-gradient(135deg, var(--deep-teal), #3D8B8B); }
+.progress-ring { transition: stroke-dashoffset 0.5s ease; }
+.fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.pulse-gentle { animation: pulseGentle 2s infinite; }
+@keyframes pulseGentle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+.slide-up { animation: slideUp 0.5s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(45, 106, 106, 0.2); }
+.heatmap-cell { transition: all 0.3s ease; }
+.charter-bg { background: linear-gradient(145deg, #FFF8F0 0%, #FEF0E3 50%, #F0E8D8 100%); }
+.loading-dots::after { content: ''; animation: dots 1.5s infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--gentle-sage); border-radius: 4px; }
+.touch-target { min-height: 44px; min-width: 44px; }
+</style>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cream: '#FFF8F0',
+        coral: '#F4845F',
+        teal: '#2D6A6A',
+        sage: '#A8C5A0',
+        gold: '#E8B04A',
+        lavender: '#C4B1D4',
+        navy: '#2C3E50'
+      }
+    }
+  }
+}
+</script>
+</head>
+<body class="bg-cream min-h-screen" x-data="app()" x-init="init()">
+
+<!-- Loading Overlay -->
+<div x-show="loading" x-transition class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+  <div class="text-center">
+    <div class="w-16 h-16 border-4 border-teal/20 border-t-teal rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-teal font-medium text-lg" x-text="loadingMessage"></p>
+    <p class="text-gray-400 text-sm mt-1 loading-dots">Working</p>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="gradient-header text-white sticky top-0 z-40">
+  <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">💞</span>
+      <div>
+        <h1 class="display-font text-lg leading-tight">Shared Values</h1>
+        <p class="text-[10px] text-white/70 -mt-0.5">Builder for Couples</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button @click="showTokenStats = !showTokenStats" class="touch-target flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 transition text-sm">📊</button>
+      <button x-show="currentStep > 0" @click="resetApp()" class="touch-target flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 transition text-sm">🔄</button>
+    </div>
+  </div>
+  <!-- Progress Bar -->
+  <div x-show="currentStep > 0 && currentStep < 7" class="h-1 bg-white/20">
+    <div class="h-full bg-gold transition-all duration-500" :style="`width: ${(currentStep / 6) * 100}%`"></div>
+  </div>
+</header>
+
+<!-- Token Stats Modal -->
+<div x-show="showTokenStats" x-transition @click.self="showTokenStats = false" class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-sm p-5 card-shadow">
+    <h3 class="font-bold text-navy mb-3">📊 AI Usage Stats</h3>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-gray-500">Total AI Calls:</span><span class="font-medium" x-text="aiStats.totalCalls"></span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Input Tokens:</span><span class="font-medium" x-text="aiStats.totalInputTokens"></span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Output Tokens:</span><span class="font-medium" x-text="aiStats.totalOutputTokens"></span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Total Time:</span><span class="font-medium" x-text="(aiStats.totalTime / 1000).toFixed(1) + 's'"></span></div>
+    </div>
+    <button @click="showTokenStats = false" class="mt-4 w-full py-2.5 bg-teal text-white rounded-xl font-medium touch-target">Close</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<main class="max-w-lg mx-auto px-4 pb-24">
+
+  <!-- STEP 0: Welcome -->
+  <div x-show="currentStep === 0" class="fade-in py-8">
+    <div class="text-center mb-8">
+      <div class="text-6xl mb-4">🌱</div>
+      <h2 class="display-font text-3xl text-navy mb-3">Welcome, Growing Family!</h2>
+      <p class="text-gray-600 leading-relaxed">Build a shared values charter together — your compass for parenting, finances, and the beautiful journey ahead.</p>
+    </div>
+    <div class="space-y-3 mb-8">
+      <div class="bg-white rounded-xl p-4 card-shadow flex gap-3 items-start">
+        <span class="text-2xl">💬</span>
+        <div><h4 class="font-semibold text-navy text-sm">Guided Dialogues</h4><p class="text-xs text-gray-500">AI-facilitated conversations about what matters most</p></div>
+      </div>
+      <div class="bg-white rounded-xl p-4 card-shadow flex gap-3 items-start">
+        <span class="text-2xl">📜</span>
+        <div><h4 class="font-semibold text-navy text-sm">Living Charter</h4><p class="text-xs text-gray-500">A beautiful, printable family values document</p></div>
+      </div>
+      <div class="bg-white rounded-xl p-4 card-shadow flex gap-3 items-start">
+        <span class="text-2xl">🔥</span>
+        <div><h4 class="font-semibold text-navy text-sm">Conflict Heatmap</h4><p class="text-xs text-gray-500">See where you align and where to grow</p></div>
+      </div>
+      <div class="bg-white rounded-xl p-4 card-shadow flex gap-3 items-start">
+        <span class="text-2xl">🎯</span>
+        <div><h4 class="font-semibold text-navy text-sm">Family Rituals</h4><p class="text-xs text-gray-500">Practical daily practices rooted in your values</p></div>
+      </div>
+    </div>
+    <button @click="currentStep = 1" class="btn-primary w-full py-4 text-white font-semibold rounded-2xl text-lg touch-target pulse-gentle card-shadow">
+      Start Building Together ✨
+    </button>
+    <p class="text-center text-xs text-gray-400 mt-3">~15 minutes • Saves automatically • Free</p>
+  </div>
+
+  <!-- STEP 1: Partner Names -->
+  <div x-show="currentStep === 1" class="fade-in py-6">
+    <div class="text-center mb-6">
+      <span class="text-4xl">👫</span>
+      <h2 class="display-font text-2xl text-navy mt-2">Who's Building Together?</h2>
+      <p class="text-gray-500 text-sm mt-1">Enter both partners' names to personalize your journey</p>
+    </div>
+    <div class="space-y-4 mb-6">
+      <div>
+        <label class="text-sm font-medium text-navy mb-1 block">Partner 1</label>
+        <input x-model="data.partner1" type="text" placeholder="e.g., Alex" class="w-full px-4 py-3.5 rounded-xl border-2 border-sage/30 bg-white text-navy font-medium touch-target focus:border-teal">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-navy mb-1 block">Partner 2</label>
+        <input x-model="data.partner2" type="text" placeholder="e.g., Jordan" class="w-full px-4 py-3.5 rounded-xl border-2 border-sage/30 bg-white text-navy font-medium touch-target focus:border-teal">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-navy mb-1 block">Life Stage</label>
+        <select x-model="data.lifeStage" class="w-full px-4 py-3.5 rounded-xl border-2 border-sage/30 bg-white text-navy font-medium touch-target focus:border-teal">
+          <option value="">Select your stage...</option>
+          <option value="expecting">🤰 Expecting</option>
+          <option value="newborn">👶 Newborn (0-6 months)</option>
+          <option value="infant">🍼 Infant (6-12 months)</option>
+          <option value="toddler">🧸 Toddler (1-3 years)</option>
+          <option value="planning">💭 Planning for a baby</option>
+        </select>
+      </div>
+    </div>
+    <button @click="data.partner1 && data.partner2 && data.lifeStage ? currentStep = 2 : null" 
+      :class="data.partner1 && data.partner2 && data.lifeStage ? 'btn-primary' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+      class="w-full py-4 text-white font-semibold rounded-2xl text-lg touch-target card-shadow transition">
+      Continue →
+    </button>
+  </div>
+
+  <!-- STEP 2: Individual Values Selection -->
+  <div x-show="currentStep === 2" class="fade-in py-6">
+    <div class="text-center mb-4">
+      <span class="text-4xl">🎯</span>
+      <h2 class="display-font text-xl text-navy mt-2">
+        <span x-text="currentPartnerTurn === 1 ? data.partner1 : data.partner2"></span>'s Core Values
+      </h2>
+      <p class="text-gray-500 text-sm mt-1">Pick your <strong>top 5</strong> values that matter most for your family</p>
+      <div class="inline-flex items-center gap-1 bg-gold/10 text-gold px-3 py-1 rounded-full text-xs font-medium mt-2">
+        <span x-text="currentPartnerTurn === 1 ? '1' : '2'"></span>/2 partners
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-6">
+      <template x-for="value in valuesList" :key="value.id">
+        <button @click="toggleValue(value.id)" 
+          :class="selectedValues.includes(value.id) ? 'bg-teal text-white border-teal' : 'bg-white text-navy border-sage/30 hover:border-teal/50'"
+          class="border-2 rounded-xl p-3 text-left transition touch-target">
+          <span class="text-xl block mb-1" x-text="value.emoji"></span>
+          <span class="text-sm font-medium block leading-tight" x-text="value.label"></span>
+        </button>
+      </template>
+    </div>
+    <p class="text-center text-sm mb-3" :class="selectedValues.length === 5 ? 'text-teal font-medium' : 'text-gray-400'">
+      <span x-text="selectedValues.length"></span>/5 selected
+    </p>
+    <button @click="submitValues()" 
+      :class="selectedValues.length === 5 ? 'btn-primary' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+      class="w-full py-4 text-white font-semibold rounded-2xl text-lg touch-target card-shadow transition">
+      <span x-text="currentPartnerTurn === 1 ? `Done! Pass to ${data.partner2} →` : 'Continue to Dialogue →'"></span>
+    </button>
+  </div>
+
+  <!-- STEP 3: Reflective Dialogue -->
+  <div x-show="currentStep === 3" class="fade-in py-6">
+    <div class="text-center mb-4">
+      <span class="text-4xl">💬</span>
+      <h2 class="display-font text-xl text-navy mt-2">Guided Dialogue</h2>
+      <p class="text-gray-500 text-sm mt-1">Discuss together, then each share your perspective</p>
+      <div class="inline-flex items-center gap-1 bg-coral/10 text-coral px-3 py-1 rounded-full text-xs font-medium mt-2">
+        Question <span x-text="currentQuestion + 1"></span>/<span x-text="dialogueQuestions.length"></span>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-5 card-shadow mb-4">
+      <p class="text-navy font-medium text-base leading-relaxed" x-text="dialogueQuestions[currentQuestion]?.question"></p>
+      <p class="text-xs text-gray-400 mt-2 italic" x-text="dialogueQuestions[currentQuestion]?.hint"></p>
+    </div>
+    <div class="space-y-3 mb-4">
+      <div>
+        <label class="text-xs font-semibold text-teal mb-1 block" x-text="data.partner1 + `'s thoughts`"></label>
+        <textarea x-model="dialogueAnswers[currentQuestion].p1" rows="3" placeholder="Share your honest perspective..." class="w-full px-4 py-3 rounded-xl border-2 border-sage/30 bg-white text-navy text-sm touch-target focus:border-teal resize-none"></textarea>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-coral mb-1 block" x-text="data.partner2 + `'s thoughts`"></label>
+        <textarea x-model="dialogueAnswers[currentQuestion].p2" rows="3" placeholder="Share your honest perspective..." class="w-full px-4 py-3 rounded-xl border-2 border-sage/30 bg-white text-navy text-sm touch-target focus:border-teal resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button x-show="currentQuestion > 0" @click="currentQuestion--" class="px-6 py-3.5 bg-white border-2 border-sage/30 text-navy font-medium rounded-xl touch-target">← Back</button>
+      <button @click="nextQuestion()" 
+        :class="dialogueAnswers[currentQuestion]?.p1 && dialogueAnswers[currentQuestion]?.p2 ? 'btn-primary' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+        class="flex-1 py-3.5 text-white font-semibold rounded-xl touch-target card-shadow transition">
+        <span x-text="currentQuestion < dialogueQuestions.length - 1 ? 'Next Question →' : 'Generate Charter ✨'"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Conflict Heatmap -->
+  <div x-show="currentStep === 4" class="fade-in py-6">
+    <div class="text-center mb-4">
+      <span class="text-4xl">🔥</span>
+      <h2 class="display-font text-xl text-navy mt-2">Alignment Heatmap</h2>
+      <p class="text-gray-500 text-sm mt-1">See where you shine together and where to focus</p>
+    </div>
+    <div class="bg-white rounded-2xl p-4 card-shadow mb-4">
+      <div class="space-y-3">
+        <template x-for="item in heatmapData" :key="item.topic">
+          <div class="flex items-center gap-3">
+            <span class="text-lg w-8 text-center" x-text="item.emoji"></span>
+            <div class="flex-1">
+              <div class="flex justify-between mb-1">
+                <span class="text-xs font-medium text-navy" x-text="item.topic"></span>
+                <span class="text-xs font-bold" :class="item.score >= 80 ? 'text-green-500' : item.score >= 50 ? 'text-gold' : 'text-coral'" x-text="item.score + '%'"></span>
+              </div>
+              <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-700" 
+                  :class="item.score >= 80 ? 'bg-green-400' : item.score >= 50 ? 'bg-gold' : 'bg-coral'"
+                  :style="`width: ${item.score}%`"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div x-show="heatmapInsight" class="bg-lavender/20 rounded-2xl p-4 mb-4">
+      <p class="text-sm text-navy leading-relaxed" x-text="heatmapInsight"></p>
+    </div>
+    <button @click="currentStep = 5" class="btn-primary w-full py-4 text-white font-semibold rounded-2xl text-lg touch-target card-shadow">
+      View Your Charter 📜
+    </button>
+  </div>
+
+  <!-- STEP 5: Values Charter -->
+  <div x-show="currentStep === 5" class="fade-in py-6">
+    <div class="text-center mb-4">
+      <span class="text-4xl">📜</span>
+      <h2 class="display-font text-xl text-navy mt-2">Your Family Values Charter</h2>
+      <p class="text-gray-500 text-sm mt-1">A living document for your family's journey</p>
+    </div>
+    <div id="charter-printable" class="charter-bg rounded-2xl p-5 card-shadow mb-4 border border-gold/20">
+      <div class="text-center mb-4 pb-4 border-b border-gold/20">
+        <p class="text-xs text-gold font-semibold tracking-widest uppercase">Family Values Charter</p>
+        <h3 class="display-font text-2xl text-navy mt-1">The <span x-text="data.partner1"></span> & <span x-text="data.partner2"></span> Family</h3>
+        <p class="text-xs text-gray-400 mt-1" x-text="new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'})"></p>
+      </div>
+      <div x-html="charterHTML" class="prose prose-sm max-w-none text-navy"></div>
+    </div>
+    <div class="flex gap-3 mb-3">
+      <button @click="printCharter()" class="flex-1 py-3.5 bg-white border-2 border-teal text-teal font-semibold rounded-xl touch-target">🖨️ Print</button>
+      <button @click="currentStep = 6" class="flex-1 py-3.5 btn-primary text-white font-semibold rounded-xl touch-target card-shadow">Rituals & Scripts →</button>
+    </div>
+  </div>
+
+  <!-- STEP 6: Rituals, Scripts & Kid-Friendly -->
+  <div x-show="currentStep === 6" class="fade-in py-6">
+    <div class="text-center mb-4">
+      <span class="text-4xl">🎯</span>
+      <h2 class="display-font text-xl text-navy mt-2">Your Action Toolkit</h2>
+      <p class="text-gray-500 text-sm mt-1">Practical tools to live your values daily</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
+      <button @click="activeTab = 'rituals'" :class="activeTab === 'rituals' ? 'bg-white card-shadow text-navy' : 'text-gray-400'" class="flex-1 py-2.5 rounded-lg text-xs font-semibold transition touch-target">🌅 Rituals</button>
+      <button @click="activeTab = 'scripts'" :class="activeTab === 'scripts' ? 'bg-white card-shadow text-navy' : 'text-gray-400'" class="flex-1 py-2.5 rounded-lg text-xs font-semibold transition touch-target">💬 Scripts</button>
+      <button @click="activeTab = 'kidFriendly'" :class="activeTab === 'kidFriendly' ? 'bg-white card-shadow text-navy' : 'text-gray-400'" class="flex-1 py-2.5 rounded-lg text-xs font-semibold transition touch-target">🧒 Kid-Friendly</button>
+    </div>
+
+    <!-- Rituals Tab -->
+    <div x-show="activeTab === 'rituals'" class="space-y-3">
+      <template x-for="(ritual, i) in rituals" :key="i">
+        <div class="bg-white rounded-xl p-4 card-shadow">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl" x-text="ritual.emoji"></span>
+            <div>
+              <h4 class="font-semibold text-navy text-sm" x-text="ritual.name"></h4>
+              <p class="text-xs text-gray-500 mt-1" x-text="ritual.description"></p>
+              <span class="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-sage/20 text-teal" x-text="ritual.frequency"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Scripts Tab -->
+    <div x-show="activeTab === 'scripts'" class="space-y-3">
+      <template x-for="(script, i) in negotiationScripts" :key="i">
+        <div class="bg-white rounded-xl p-4 card-shadow">
+          <h4 class="font-semibold text-navy text-sm flex items-center gap-2">
+            <span x-text="script.emoji"></span><span x-text="script.scenario"></span>
+          </h4>
+          <div class="mt-2 space-y-2">
+            <div class="bg-teal/5 rounded-lg p-2.5">
+              <p class="text-[10px] font-semibold text-teal mb-0.5">Try saying:</p>
+              <p class="text-xs text-navy italic" x-text="script.script"></p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Kid-Friendly Tab -->
+    <div x-show="activeTab === 'kidFriendly'">
+      <div class="bg-white rounded-xl p-5 card-shadow">
+        <h4 class="font-semibold text-navy text-center mb-3">🌈 Our Family Rules</h4>
+        <p class="text-xs text-gray-400 text-center mb-4">Simple language your kids will understand</p>
+        <div x-html="kidFriendlyHTML" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <div class="mt-6 space-y-3">
+      <button @click="scheduleCheckIn()" class="w-full py-3.5 bg-white border-2 border-gold text-gold font-semibold rounded-xl touch-target">⏰ Schedule Monthly Check-In</button>
+      <button @click="currentStep = 7" class="w-full py-4 btn-secondary text-white font-semibold rounded-2xl text-lg touch-target card-shadow">View Summary Dashboard 🏠</button>
+    </div>
+  </div>
+
+  <!-- STEP 7: Dashboard -->
+  <div x-show="currentStep === 7" class="fade-in py-6">
+    <div class="text-center mb-6">
+      <span class="text-5xl">🏠</span>
+      <h2 class="display-font text-2xl text-navy mt-2">Your Values Home</h2>
+      <p class="text-gray-500 text-sm">Everything in one place</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <button @click="currentStep = 4" class="bg-white rounded-xl p-4 card-shadow text-center touch-target">
+        <span class="text-3xl block mb-1">🔥</span>
+        <span class="text-xs font-semibold text-navy">Heatmap</span>
+      </button>
+      <button @click="currentStep = 5" class="bg-white rounded-xl p-4 card-shadow text-center touch-target">
+        <span class="text-3xl block mb-1">📜</span>
+        <span class="text-xs font-semibold text-navy">Charter</span>
+      </button>
+      <button @click="currentStep = 6; activeTab = 'rituals'" class="bg-white rounded-xl p-4 card-shadow text-center touch-target">
+        <span class="text-3xl block mb-1">🌅</span>
+        <span class="text-xs font-semibold text-navy">Rituals</span>
+      </button>
+      <button @click="currentStep = 6; activeTab = 'scripts'" class="bg-white rounded-xl p-4 card-shadow text-center touch-target">
+        <span class="text-3xl block mb-1">💬</span>
+        <span class="text-xs font-semibold text-navy">Scripts</span>
+      </button>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 card-shadow mb-4">
+      <h4 class="font-semibold text-navy text-sm mb-3">📅 Check-In History</h4>
+      <template x-if="data.checkIns && data.checkIns.length > 0">
+        <div class="space-y-2">
+          <template x-for="(ci, i) in data.checkIns" :key="i">
+            <div class="flex items-center gap-3 text-xs">
+              <span class="text-green-400">✓</span>
+              <span class="text-gray-500" x-text="ci.date"></span>
+              <span class="text-navy font-medium" x-text="ci.note"></span>
+            </div>
+          </template>
+        </div>
+      </template>
+      <template x-if="!data.checkIns || data.checkIns.length === 0">
+        <p class="text-xs text-gray-400">No check-ins yet. Schedule one above! ⏰</p>
+      </template>
+    </div>
+
+    <button @click="startCheckIn()" class="w-full py-4 btn-primary text-white font-semibold rounded-2xl text-lg touch-target card-shadow">
+      Start a Check-In Now 🔄
+    </button>
+  </div>
+
+  <!-- Check-In Modal -->
+  <div x-show="showCheckIn" x-transition @click.self="showCheckIn = false" class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 card-shadow max-h-[80vh] overflow-y-auto">
+      <h3 class="font-bold text-navy text-lg mb-2">🔄 Values Check-In</h3>
+      <p class="text-sm text-gray-500 mb-4">How are your values showing up in daily life?</p>
+      <div class="space-y-3 mb-4">
+        <div>
+          <label class="text-xs font-medium text-navy mb-1 block">What's been working well?</label>
+          <textarea x-model="checkInData.working" rows="2" class="w-full px-3 py-2.5 rounded-xl border-2 border-sage/30 text-sm resize-none focus:border-teal" placeholder="e.g., Our bedtime routine is solid..."></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-navy mb-1 block">What needs attention?</label>
+          <textarea x-model="checkInData.attention" rows="2" class="w-full px-3 py-2.5 rounded-xl border-2 border-sage/30 text-sm resize-none focus:border-teal" placeholder="e.g., We've been stressed about..."></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-navy mb-1 block">Any values to revisit?</label>
+          <textarea x-model="checkInData.revisit" rows="2" class="w-full px-3 py-2.5 rounded-xl border-2 border-sage/30 text-sm resize-none focus:border-teal" placeholder="e.g., We want to prioritize..."></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button @click="showCheckIn = false" class="flex-1 py-3 border-2 border-gray-200 text-gray-500 rounded-xl font-medium touch-target">Cancel</button>
+        <button @click="saveCheckIn()" class="flex-1 py-3 btn-primary text-white rounded-xl font-medium touch-target">Save ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Toast -->
+  <div x-show="errorMsg" x-transition class="fixed bottom-20 left-4 right-4 max-w-lg mx-auto bg-red-50 border border-red-200 rounded-xl p-4 z-50">
+    <div class="flex items-start gap-2">
+      <span>⚠️</span>
+      <div>
+        <p class="text-sm text-red-700 font-medium" x-text="errorMsg"></p>
+        <button @click="errorMsg = ''" class="text-xs text-red-500 underline mt-1">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// Global AI stats
+window.aiTotalInputTokens = 0;
+window.aiTotalOutputTokens = 0;
+window.aiTotalTime = 0;
+window.aiTotalCalls = 0;
+window.aiTimeByAlias = {};
+
+async function callAI(alias, params, retries = 3) {
+  const start = Date.now();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch('https://16504442930.work/run_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, params })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        if (attempt === retries - 1) {
+          // Reformat error with AI
+          try {
+            const errRes = await fetch('https://16504442930.work/run_prompt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                alias: 'genericAI',
+                params: {
+                  prompt: `Reformat this API error message to be user-friendly and empowering. Include the full original error. Original error: "${errText}". Return JSON with key "message" as a string.`
+                }
+              })
+            });
+            const errData = await errRes.json();
+            throw new Error(errData.message || errText);
+          } catch(e) {
+            throw new Error(`Something went wrong. Please try again. Details: ${errText}`);
+          }
+        }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      const data = await res.json();
+      const elapsed = Date.now() - start;
+      window.aiTotalCalls++;
+      window.aiTotalTime += elapsed;
+      window.aiTotalInputTokens += (data.input_tokens || data.usage?.input_tokens || 0);
+      window.aiTotalOutputTokens += (data.output_tokens || data.usage?.output_tokens || 0);
+      if (!window.aiTimeByAlias[alias]) window.aiTimeByAlias[alias] = 0;
+      window.aiTimeByAlias[alias] += elapsed;
+      return data;
+    } catch(e) {
+      if (attempt === retries - 1) throw e;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+}
+
+function app() {
+  return {
+    currentStep: 0,
+    loading: false,
+    loadingMessage: 'Preparing...',
+    errorMsg: '',
+    showTokenStats: false,
+    showCheckIn: false,
+    activeTab: 'rituals',
+    currentPartnerTurn: 1,
+    currentQuestion: 0,
+    selectedValues: [],
+    
+    data: {
+      partner1: '',
+      partner2: '',
+      lifeStage: '',
+      partner1Values: [],
+      partner2Values: [],
+      checkIns: []
+    },
+    
+    dialogueQuestions: [],
+    dialogueAnswers: [],
+    heatmapData: [],
+    heatmapInsight: '',
+    charterHTML: '',
+    rituals: [],
+    negotiationScripts: [],
+    kidFriendlyHTML: '',
+    checkInData: { working: '', attention: '', revisit: '' },
+    
+    aiStats: {
+      totalCalls: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalTime: 0
+    },
+
+    valuesList: [
+      { id: 'faith', emoji: '🙏', label: 'Faith & Spirituality' },
+      { id: 'education', emoji: '📚', label: 'Education & Learning' },
+      { id: 'kindness', emoji: '💛', label: 'Kindness & Compassion' },
+      { id: 'adventure', emoji: '🌍', label: 'Adventure & Exploration' },
+      { id: 'health', emoji: '🏃', label: 'Health & Wellness' },
+      { id: 'creativity', emoji: '🎨', label: 'Creativity & Expression' },
+      { id: 'financial', emoji: '💰', label: 'Financial Security' },
+      { id: 'community', emoji: '🤝', label: 'Community & Service' },
+      { id: 'independence', emoji: '🦅', label: 'Independence & Resilience' },
+      { id: 'tradition', emoji: '🏡', label: 'Family Traditions' },
+      { id: 'honesty', emoji: '✨', label: 'Honesty & Integrity' },
+      { id: 'nature', emoji: '🌿', label: 'Nature & Environment' },
+      { id: 'humor', emoji: '😄', label: 'Joy & Humor' },
+      { id: 'respect', emoji: '🫡', label: 'Respect & Boundaries' },
+      { id: 'equality', emoji: '⚖️', label: 'Equality & Fairness' },
+      { id: 'simplicity', emoji: '🕊️', label: 'Simplicity & Presence' }
+    ],
+
+    init() {
+      const saved = localStorage.getItem('sharedValuesApp');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          this.data = { ...this.data, ...parsed.data };
+          if (parsed.currentStep) this.currentStep = parsed.currentStep;
+          if (parsed.heatmapData) this.heatmapData = parsed.heatmapData;
+          if (parsed.heatmapInsight) this.heatmapInsight = parsed.heatmapInsight;
+          if (parsed.charterHTML) this.charterHTML = parsed.charterHTML;
+          if (parsed.rituals) this.rituals = parsed.rituals;
+          if (parsed.negotiationScripts) this.negotiationScripts = parsed.negotiationScripts;
+          if (parsed.kidFriendlyHTML) this.kidFriendlyHTML = parsed.kidFriendlyHTML;
+          if (parsed.dialogueQuestions) this.dialogueQuestions = parsed.dialogueQuestions;
+          if (parsed.dialogueAnswers) this.dialogueAnswers = parsed.dialogueAnswers;
+        } catch(e) {}
+      }
+      this.$watch('currentStep', () => this.saveState());
+      this.$watch('data', () => this.saveState(), { deep: true });
+    },
+
+    saveState() {
+      localStorage.setItem('sharedValuesApp', JSON.stringify({
+        currentStep: this.currentStep,
+        data: this.data,
+        heatmapData: this.heatmapData,
+        heatmapInsight: this.heatmapInsight,
+        charterHTML: this.charterHTML,
+        rituals: this.rituals,
+        negotiationScripts: this.negotiationScripts,
+        kidFriendlyHTML: this.kidFriendlyHTML,
+        dialogueQuestions: this.dialogueQuestions,
+        dialogueAnswers: this.dialogueAnswers
+      }));
+      this.aiStats = {
+        totalCalls: window.aiTotalCalls,
+        totalInputTokens: window.aiTotalInputTokens,
+        totalOutputTokens: window.aiTotalOutputTokens,
+        totalTime: window.aiTotalTime
+      };
+    },
+
+    toggleValue(id) {
+      const idx = this.selectedValues.indexOf(id);
+      if (idx >= 0) {
+        this.selectedValues.splice(idx, 1);
+      } else if (this.selectedValues.length < 5) {
+        this.selectedValues.push(id);
+      }
+    },
+
+    submitValues() {
+      if (this.selectedValues.length !== 5) return;
+      if (this.currentPartnerTurn === 1) {
+        this.data.partner1Values = [...this.selectedValues];
+        this.selectedValues = [];
+        this.currentPartnerTurn = 2;
+      } else {
+        this.data.partner2Values = [...this.selectedValues];
+        this.selectedValues = [];
+        this.currentPartnerTurn = 1;
+        this.generateDialogue();
+      }
+    },
+
+    async generateDialogue() {
+      this.loading = true;
+      this.loadingMessage = 'Crafting your dialogue questions...';
+      try {
+        const p1Labels = this.data.partner1Values.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ');
+        const p2Labels = this.data.partner2Values.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ');
+        const shared = this.data.partner1Values.filter(v => this.data.partner2Values.includes(v));
+        const unique = [...new Set([...this.data.partner1Values, ...this.data.partner2Values])].filter(v => !shared.includes(v));
+        
+        const prompt = `You are a couples therapist and family values facilitator. A couple (${this.data.partner1} and ${this.data.partner2}) who are in the "${this.data.lifeStage}" life stage have selected their top values.
+
+${this.data.partner1}'s values: ${p1Labels}
+${this.data.partner2}'s values: ${p2Labels}
+Shared values: ${shared.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ') || 'None'}
+Unique/different values: ${unique.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ')}
+
+Generate 5 thoughtful discussion questions that help this couple explore their values alignment, especially around areas of difference. Questions should be warm, non-judgmental, and specific to their life stage. Each question should have a helpful hint for how to approach the discussion.
+
+Return a JSON object with key "questions" which is an array of exactly 5 objects, each with:
+- "question": string (the discussion question, 1-2 sentences)
+- "hint": string (a brief helpful hint, 1 sentence)
+
+Return ONLY valid JSON.`;
+
+        const result = await callAI('genericAI', { prompt });
+        this.dialogueQuestions = result.questions;
+        this.dialogueAnswers = result.questions.map(() => ({ p1: '', p2: '' }));
+        this.currentQuestion = 0;
+        this.currentStep = 3;
+        this.saveState();
+      } catch(e) {
+        this.errorMsg = e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async nextQuestion() {
+      if (!this.dialogueAnswers[this.currentQuestion]?.p1 || !this.dialogueAnswers[this.currentQuestion]?.p2) return;
+      if (this.currentQuestion < this.dialogueQuestions.length - 1) {
+        this.currentQuestion++;
+        this.saveState();
+      } else {
+        await this.generateCharter();
+      }
+    },
+
+    async generateCharter() {
+      this.loading = true;
+      this.loadingMessage = 'Synthesizing your shared values...';
+      try {
+        const p1Labels = this.data.partner1Values.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ');
+        const p2Labels = this.data.partner2Values.map(id => this.valuesList.find(v => v.id === id)?.label).join(', ');
+        
+        const dialogueSummary = this.dialogueQuestions.map((q, i) => 
+          `Q: ${q.question}\n${this.data.partner1}: ${this.dialogueAnswers[i].p1}\n${this.data.partner2}: ${this.dialogueAnswers[i].p2}`
+        ).join('\n\n');
+
+        // Generate heatmap
+        this.loadingMessage = 'Analyzing alignment...';
+        const heatmapPrompt = `You are a couples therapist analyzing alignment between two partners.
+
+Partners: ${this.data.partner1} and ${this.data.partner2}
+Life stage: ${this.data.lifeStage}
+${this.data.partner1}'s values: ${p1Labels}
+${this.data.partner2}'s values: ${p2Labels}
+
+Their dialogue responses:
+${dialogueSummary}
+
+Analyze their alignment across 6 key family life areas. For each area, provide an alignment score (0-100) based on how closely their responses and value selections align.
+
+Return a JSON object with:
+- "heatmap": array of exactly 6 objects, each with:
+  - "topic": string (area name, e.g., "Parenting Style", "Financial Priorities", "Work-Life Balance", "Spiritual Life", "Extended Family", "Communication")
+  - "emoji": string (single emoji for the topic)
+  - "score": number (0-100 alignment score)
+- "insight": string (2-3 sentence personalized insight about their overall alignment, warm and encouraging tone)
+
+Return ONLY valid JSON.`;
+
+        const heatmapResult = await callAI('genericAI', { prompt: heatmapPrompt });
+        this.heatmapData = heatmapResult.heatmap;
+        this.heatmapInsight = heatmapResult.insight;
+
+        // Generate charter
+        this.loadingMessage = 'Writing your family charter...';
+        const charterPrompt = `You are a professional family values facilitator creating a beautiful, meaningful family values charter.
+
+Partners: ${this.data.partner1} and ${this.data.partner2}
+Life stage: ${this.data.lifeStage}
+${this.data.partner1}'s values: ${p1Labels}
+${this.data.partner2}'s values: ${p2Labels}
+
+Their dialogue responses:
+${dialogueSummary}
+
+Create a concise but meaningful family values charter. It should be personal, warm, and actionable. Use their actual words and values. Include a family mission statement, 4-6 core value declarations, and a closing commitment.
+
+Return a JSON object with key "charter" as a string containing HTML markup (using only p, h4, ul, li, strong, em tags with Tailwind-compatible inline classes). Make it beautiful with good structure. Keep it concise - no more than 400 words.
+
+Return ONLY valid JSON.`;
+
+        const charterResult = await callAI('genericAI', { prompt: charterPrompt });
+        this.charterHTML = charterResult.charter;
+
+        // Generate rituals, scripts, kid-friendly
+        this.loadingMessage = 'Creating your action toolkit...';
+        const toolkitPrompt = `You are a family life coach creating practical tools for a couple.
+
+Partners: ${this.data.partner1} and ${this.data.partner2}
+Life stage: ${this.data.lifeStage}
+Their core values: ${p1Labels}, ${p2Labels}
+
+Their dialogue highlights:
+${dialogueSummary}
+
+Create three types of practical tools:
+
+1. RITUALS: 4 daily/weekly family rituals that reinforce their values
+2. SCRIPTS: 3 negotiation scripts for common conflict scenarios relevant to their life stage and values
+3. KID-FRIENDLY: 5 simple family rules in language a 3-5 year old could understand
+
+Return a JSON object with:
+- "rituals": array of 4 objects, each with:
+  - "emoji": string (single emoji)
+  - "name": string (ritual name)
+  - "description": string (1-2 sentences)
+  - "frequency": string (e.g., "Daily", "Weekly", "Monthly")
+- "scripts": array of 3 objects, each with:
+  - "emoji": string (single emoji)
+  - "scenario": string (the conflict scenario)
+  - "script": string (what to say, 1-3 sentences)
+- "kidRules": array of 5 objects, each with:
+  - "emoji": string (single emoji)
+  - "rule": string (simple rule in kid language)
+
+Return ONLY valid JSON.`;
+
+        const toolkitResult = await callAI('genericAI', { prompt: toolkitPrompt });
+        this.rituals = toolkitResult.rituals;
+        this.negotiationScripts = toolkitResult.scripts;
+        this.kidFriendlyHTML = toolkitResult.kidRules.map(r => 
+          `<div class="flex items-center gap-3 bg-cream rounded-xl p-3"><span class="text-2xl">${r.emoji}</span><p class="text-sm text-navy font-medium">${r.rule}</p></div>`
+        ).join('');
+
+        this.currentStep = 4;
+        this.saveState();
+        
+        // Celebrate!
+        setTimeout(() => {
+          if (typeof confetti === 'function') {
+            confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+          }
+        }, 500);
+
+      } catch(e) {
+        this.errorMsg = e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    printCharter() {
+      const el = document.getElementById('charter-printable');
+      const win = window.open('', '_blank');
+      win.document.write(`
+        <html><head><title>Family Values Charter</title>
+        <style>body{font-family:Georgia,serif;max-width:600px;margin:40px auto;padding:20px;color:#2C3E50;line-height:1.6;}
+        h3,h4{font-family:Georgia,serif;} .border-b{border-bottom:1px solid #E8B04A;padding-bottom:16px;margin-bottom:16px;}
+        ul{padding-left:20px;} li{margin-bottom:8px;}</style></head>
+        <body>${el.innerHTML}</body></html>`);
+      win.document.close();
+      win.print();
+    },
+
+    scheduleCheckIn() {
+      if ('Notification' in window && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+      const nextDate = new Date();
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      alert(`📅 Check-in reminder set!\n\nWe recommend revisiting your values charter on ${nextDate.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}.\n\nTip: Add a recurring calendar event for the first Sunday of each month.`);
+    },
+
+    startCheckIn() {
+      this.checkInData = { working: '', attention: '', revisit: '' };
+      this.showCheckIn = true;
+    },
+
+    async saveCheckIn() {
+      if (!this.checkInData.working && !this.checkInData.attention) {
+        this.errorMsg = 'Please fill in at least one field.';
+        return;
+      }
+      if (!this.data.checkIns) this.data.checkIns = [];
+      this.data.checkIns.push({
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        note: this.checkInData.working.substring(0, 50) + (this.checkInData.working.length > 50 ? '...' : ''),
+        full: { ...this.checkInData }
+      });
+      this.showCheckIn = false;
+      this.saveState();
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 30, spread: 40, origin: { y: 0.8 } });
+      }
+    },
+
+    resetApp() {
+      if (confirm('🔄 Start fresh? This will clear all your data. You can\'t undo this.')) {
+        localStorage.removeItem('sharedValuesApp');
+        location.reload();
+      }
+    }
+  };
+}
+</script>
+</body>
+</html>
